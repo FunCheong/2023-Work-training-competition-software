@@ -67,6 +67,7 @@ void MecanumMove(float disY, float disX, float spdLimit, bool waitUntilStop) {
         for (int i = 0; i < 4; i++) {
             PID_Reset(&CarInfo.msPid[i]);
             PID_Reset(&CarInfo.mpPid[i]);
+            CarInfo.psi[i] = 0;
         }
     }
 
@@ -78,11 +79,7 @@ void MecanumMove(float disY, float disX, float spdLimit, bool waitUntilStop) {
         if (spdLimit == 0)
             CarInfo.spdLimit[i] = 0x7FFF;
         else {
-            if (i == 0 || i == 1)
                 CarInfo.spdLimit[i] = spdLimit;
-            else
-                CarInfo.spdLimit[i] = spdLimit * fabsf(plusY - plusX) / fabsf(plusY + plusX);
-
         }
     }
 
@@ -176,7 +173,7 @@ void MapSpeedSet(float spdY, float spdX) {
         PID_Reset(&CarInfo.cpPidY);
     }
 
-    VecRotate(spdX, spdY, -CarInfo.yaw);
+    VecRotate(spdX, spdY, CarInfo.yaw);
     MecanumSpeedSet(spdY, spdX);
 }
 

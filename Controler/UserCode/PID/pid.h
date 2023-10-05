@@ -46,13 +46,6 @@ typedef struct {
 void PID_Init(Pid_t *pid, float kp, float ki, float kd);
 
 /**
- * @brief PID设定目标值
- * @param pid pid句柄
- * @param aim 目标值
- */
-void PID_SetAim(Pid_t *pid, float aim) ;
-
-/**
  * @brief PID重置函数
  * @param pid pid句柄
  * @note 重置函数不对PID参数和目标值进行重置，仅对运算中间量进行重置
@@ -75,5 +68,14 @@ float PID_Realize(Pid_t* pid, float input);
  * @note 角度使用弧度制
  */
 float PID_RealizeForAngle(Pid_t *pid, float input);
+
+/**
+ * @brief 缓启动函数
+ * @param slewVal 当前输出量
+ * @param refVal 输出量目标
+ * @param slewRate 缓启动速度
+ * @return 缓启动类型
+ */
+float Slew_Func(float *slewVal, float refVal, float slewRate);
 
 #endif // PID_H

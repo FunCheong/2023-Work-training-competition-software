@@ -15,7 +15,10 @@
 #include "utils.h"
 
 extern int PIMaxError;
+extern int slot;
 
+//TODO:测试用变量
+extern uint8_t go_flag;
 
 short uart_charPut(char *data, unsigned short len) {
     HAL_UART_Transmit(&huart5, (const uint8_t *) data, len, HAL_MAX_DELAY);
@@ -120,7 +123,7 @@ uint8_t motormove(int argc, char *argv[]) {
 }
 
 uint8_t mapmove(int argc, char *argv[]) {
-    if (argc == 1) {
+    if (argc <= 2) {
         printf("need an argument!\r\n");
         return 1;
     } else {
@@ -128,11 +131,16 @@ uint8_t mapmove(int argc, char *argv[]) {
         float b = (float) atof(argv[2]);
         float c = (float) atof(argv[3]);
 
-        printf("disY = %f,disX = %f,spdLimit = %f\r\n", a, b, c);
-        MapMove(a, b, c, 0);
+        printf("disY = %f,disX = %f,rad = %f\r\n", a, b, c);
+        MoveTo(a,b, NONBLOCK);
+        TurnTo(c,NONBLOCK);
 
     }
     return 0;
+}
+
+uint8_t materialput(int argc, char *argv[]){
+        slot = atoi(argv[1]);
 }
 
 uint8_t rota(int argc, char *argv[]) {
@@ -150,6 +158,18 @@ uint8_t rota(int argc, char *argv[]) {
     return 0;
 }
 
+uint8_t clipmove(int argc, char *argv[]){
+    float aim = atof(argv[1]);
+    if(aim < TopHeight|| aim > Ground_Height){
+        printf("illegal parameter");
+        return 1;
+    }
+    else{
+        printf("clip moving to height:%f\r\n",aim);
+        CarInfo.mpPid[4].ctr.aim = aim;
+    }
+    return 0;
+}
 
 uint8_t ed(int argc, char *argv[]) {
     CarInfo.SerialOutputEnable = 0;
@@ -160,6 +180,12 @@ uint8_t op(int argc, char *argv[]) {
     CarInfo.SerialOutputEnable = 1;
     return 0;
 }
+
+uint8_t go(int argc, char *argv[]){
+    go_flag = 1;
+    return 0;
+}
+
 
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), motormove, motormove,
                  Move the car under the car coordinate system);
@@ -173,3 +199,11 @@ SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), 
                  Resume the SerialOutput Task);
 SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), set, set,
                  Set the Variable);
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), clipmove, clipmove,
+                 move the clip);
+
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), materialput, materialput,
+                 put a material);
+
+SHELL_EXPORT_CMD(SHELL_CMD_PERMISSION(0) | SHELL_CMD_TYPE(SHELL_TYPE_CMD_MAIN), go, go,
+                 start mission);

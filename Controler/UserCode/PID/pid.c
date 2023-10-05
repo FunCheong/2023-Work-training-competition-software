@@ -13,7 +13,6 @@
 #include "main.h"
 #include "math.h"
 
-// PID实现函数
 float PID_Realize(Pid_t *pid, float input) {
     pid->ctr.cur = input;
 
@@ -26,11 +25,12 @@ float PID_Realize(Pid_t *pid, float input) {
     return pid->kp * pid->error.cur + pid->ki * pid->error.sum + pid->kd * pid->error.bia;
 }
 
+//PID for orientation loop
 float PID_RealizeForAngle(Pid_t *pid, float input) {
     pid->ctr.cur = input;
 
     pid->error.cur = pid->ctr.aim - pid->ctr.cur;
-    if (fabsf(pid->error.cur) > M_PI && fabsf(pid->error.cur) < 2 * M_PI) { // 角度溢出处理
+    if (fabsf(pid->error.cur) > M_PI && fabsf(pid->error.cur) < 2 * M_PI) {
         if (pid->error.cur > 0) {
             pid->error.cur -= 2 * M_PI;
         } else if (pid->error.cur < 0) {
@@ -45,7 +45,6 @@ float PID_RealizeForAngle(Pid_t *pid, float input) {
     return pid->kp * pid->error.cur + pid->ki * pid->error.sum + pid->kd * pid->error.bia;
 }
 
-// PID初始化函数
 void PID_Init(Pid_t *pid, float kp, float ki, float kd) {
     pid->kp = kp;
     pid->ki = ki;
@@ -61,6 +60,21 @@ void PID_Reset(Pid_t *pid) {
     pid->error.sum = 0;
 }
 
-void PID_SetAim(Pid_t *pid, float aim) {
-    pid->ctr.aim = aim;
+float Slew_Func(float *slewVal, float refVal, float slewRate)
+{
+    static float diff = 0;
+    diff = refVal - *slewVal;
+    if (diff >= slewRate)
+    {
+        *slewVal += slewRate;
+        return (1);
+    } else if (-diff >= slewRate)
+    {
+        *slewVal -= slewRate;
+        return (-1);
+    } else
+    {
+        *slewVal = refVal;
+        return (0);
+    }
 }

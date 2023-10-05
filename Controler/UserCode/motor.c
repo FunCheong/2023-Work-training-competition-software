@@ -11,7 +11,7 @@
 
 
 int Motor_Drive(int motorID, float duty, int dir) {
-    // 硬件引脚表
+    //Hardware pins table
     static TIM_TypeDef *TIMx[5] = {TIM12, TIM16, TIM12, TIM15, TIM15};
     static volatile uint32_t *CCRx[5] =
             {&TIM12->CCR1, &TIM16->CCR1, &TIM12->CCR2, &TIM15->CCR1, &TIM15->CCR2};

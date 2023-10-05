@@ -16,26 +16,33 @@
 #include "LetterShell/shell.h"
 #include "ST7735-HAL/fonts.h"
 
+//TODO:调整车体中心，目前还是有点歪
+//Liddar offset
+#define XBIAS (10.5f)
+#define YBIAS (-1.5f)
+
 #define ToDig(rad) (rad * 57.295779513082320876798154814105f)
 #define ToRad(dig) (dig * 0.01745329251994329576923690768489f)
 
-#define ToPMWSystem(psi) (psi * 50.0f)
-
-#define PMW_X_Grid (600)
-#define PMW_Y_Grid (550)
-
 #define TopHeight       (50)
-#define Ground_Height   (2100)
-#define Store_Height    (550)
+#define Ground_Height   (1950)
+#define Store_Height    (350)
+#define Rotator_Height (950)
 
-#define FirstDigree     (217)
-#define SecondDigree    (182)
-#define ThirdDigree     (147)
+#define Ground_Angle (232)
+#define Store_Angle (52)
+
+#define FirstDegree     (145)
+#define SecondDegree    (488)
+#define ThirdDegree     (831)
 
 #define CLIP_CLOSE (1000)
-#define CLIP_OPEN  (880)
+#define CLIP_OPEN  (830)
 
 #define IsCarStatic (!CarInfo.isCarMoving)
+
+#define NONBLOCK 0
+#define BLOCK 1
 
 #define VecRotate(x, y, theta) do{              \
     float tx = x,ty = y;                        \
@@ -52,6 +59,15 @@
 #define M_PI 3.1415926535897932384626433832795
 #endif
 
+typedef enum command_state_t{
+    STATE_IDLE,
+    STATE_HEADER_LIDAR,
+    STATE_HEADER_IMAGE,
+    STATE_HEADER_QRCODE,
+    STATE_TAIL_1,
+    STATE_TAIL_2
+} command_state_t;
+
 typedef struct CarControlBlock {
     // 电机控制相关
     int16_t spd[5];
@@ -62,14 +78,15 @@ typedef struct CarControlBlock {
     float mpPIDout[5];
     float spdStep;
     float spdLimit[5];
-    bool mPsiCtr: 1;// 启用电机位置环控制标志位
-    bool firstPsiLoop: 1;// 首次进入位置环标志
+    bool mPsiCtr: 1;// motor position loop enable flag
+    bool firstPsiLoop: 1;
 
     // 整车控制相关
     PMW3901 pmw;
     float dx, dy;
     volatile float curX, curY;
     Pid_t cpPidX, cpPidY;// Car position pid
+    int16_t errX,errY;
     float spdX, spdY;
     float psiX, psiY;
     volatile bool cPsiCtr: 1;
@@ -94,7 +111,12 @@ typedef struct CarControlBlock {
 
     // 状态机状态枚举
     enum mainState {// 主状态机
-        mStart, mScan, mFetch, mDrop, mEnd
+        mStart,
+        mScan,
+        mRaw,
+        mRough,
+        mStorage,
+        mEnd
     } mainState;
 
     // PID姿态控制
@@ -117,13 +139,15 @@ void SupportRotation(float dig, uint32_t time);
 
 void SupportRotationForOS(float dig, uint32_t time);
 
+void StoreRotation(int16_t position);
+
 void ClipRotition(float position, uint32_t time);
 
-void MoveTo(float X, float Y);
+void MoveTo(float X, float Y, uint8_t block);
 
 void ClipMoveTo(int height);
 
-void TurnTo(float rad);
+void TurnTo(float rad,uint8_t block);
 
 void Pi_SwitchFromOS(void);
 
@@ -135,6 +159,16 @@ void Pi_ResetFromHAL(void);
 
 void Data_ReFormatData(uint16_t *array, int len);
 
+bool ProcessData(uint8_t c);
+
 uint8_t Data_RoughlyEqual(double curY, double curX, double aimY, double aimX, double thre);
+
+void MaterialGetFromHAL(int slot);
+
+void MaterialPutFromHAL(int slot,bool stack);
+
+void MaterialGetFromOS(int slot);
+
+void MaterialPutFromOS(int slot,bool stack);
 
 #endif //CONTROLCENTER_UTILS_H

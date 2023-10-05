@@ -105,6 +105,7 @@ void msgLog(const char *format, ...);
 #define UC_TimerResetPeriod             (10000)
 #define SupportServoID                  (6)
 #define ClipServoID                     (2)
+#define StoreServoID                    (5)
 #define StepsEachGrid_Y                 (5150)
 #define StepsEachGrid_X                 (5453)
 #define StepsEach180                    (10800)
