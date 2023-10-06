@@ -25,9 +25,10 @@
 #define ToRad(dig) (dig * 0.01745329251994329576923690768489f)
 
 #define TopHeight       (50)
-#define Ground_Height   (1950)
+#define Ground_Height   (2150)
 #define Store_Height    (350)
 #define Rotator_Height (950)
+#define Stack_Height (1050)
 
 #define Ground_Angle (232)
 #define Store_Angle (52)
@@ -43,6 +44,11 @@
 
 #define NONBLOCK 0
 #define BLOCK 1
+
+#define CMD_SCAN 0xFD
+#define CMD_CAPTURE_START 0xFE
+#define CMD_CAPTURE_FINISH 0xFB
+#define CMD_SWITCH 0xFC
 
 #define VecRotate(x, y, theta) do{              \
     float tx = x,ty = y;                        \
@@ -107,7 +113,7 @@ typedef struct CarControlBlock {
     float initGxOffset;
     float initGyOffset;
     float initGzOffset;
-    uint32_t isCarMoving;// 定时器中断中监测整车是否静止，用作步骤规划
+    volatile uint32_t isCarMoving;// 定时器中断中监测整车是否静止，用作步骤规划
 
     // 状态机状态枚举
     enum mainState {// 主状态机
@@ -170,5 +176,7 @@ void MaterialPutFromHAL(int slot,bool stack);
 void MaterialGetFromOS(int slot);
 
 void MaterialPutFromOS(int slot,bool stack);
+
+void Command_Send(uint8_t cmd);
 
 #endif //CONTROLCENTER_UTILS_H

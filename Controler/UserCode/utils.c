@@ -55,6 +55,7 @@ PID_Init(&CarInfo.cpPidY, 0.8f, 0, 0);}while(0)
 static void __RunMainState(void) {
     int i;
     float x_record[3],y_record[3];
+    static uint8_t loop_cnt = 0;
 
     switch (CarInfo.mainState) {
         osStatus_t status;
@@ -73,22 +74,22 @@ static void __RunMainState(void) {
             break;
         case mScan:
             MoveTo(0,20,BLOCK);
-            MoveTo(55,20,BLOCK);//QRCode position
+            MoveTo(60,20,BLOCK);//QRCode position
             CarInfo.mainState = mStorage;
             break;
         case mStorage:
-            MoveTo(135,20,BLOCK);//Storage position
+            MoveTo(140,20,BLOCK);//Storage position
             CarInfo.mainState = mRaw;
             break;
         case mRaw:
             MoveTo(180,20,BLOCK);
             TurnTo(1.57f,BLOCK);
-            MoveTo(190,90,BLOCK);
 
-            CarPositionLoopSet(0);
+            Command_Send(CMD_CAPTURE_START);
+
             for(i=1;i<=3;i++) {
-                HAL_UART_Transmit(&huart4, (uint8_t *) "a", 1, 0xFF);
-                osDelay(1000);//wait for camera to switch
+                MoveTo(195,107,BLOCK);
+                osDelay(500);//wait for camera to switch
                 CarInfo.PiReceiveFlag = 0;
                 CarPositionLoopSet(0);
                 CarInfo.errX = 2;
@@ -104,8 +105,13 @@ static void __RunMainState(void) {
 
                 MecanumSpeedSet(0.0f, 0.0f);
                 MaterialPutFromOS(i,false);
+
+                Command_Send(CMD_SWITCH);
+
+                CarPositionLoopSet(1);
             }
-            CarPositionLoopSet(1);
+
+            Command_Send(CMD_CAPTURE_FINISH);
 
             for(i=1;i<=3;i++){
                 MoveTo(-y_record[i-1],-x_record[i-1],BLOCK);
@@ -116,14 +122,49 @@ static void __RunMainState(void) {
         case mRough:
             MoveTo(180,180,BLOCK);
             TurnTo(3.14f,BLOCK);
-            MoveTo(90,180,BLOCK);
-            CarInfo.mainState = mEnd;
+
+            Command_Send(CMD_CAPTURE_START);
+
+            for(i=1;i<=3;i++) {
+                MoveTo(105,185,BLOCK);
+                osDelay(500);//wait for camera to switch
+                CarInfo.PiReceiveFlag = 0;
+                CarPositionLoopSet(0);
+                CarInfo.errX = 2;
+                while (abs(CarInfo.errX >= 2) || abs(CarInfo.errY >= 2)) {
+                    if (CarInfo.PiReceiveFlag) {
+                        MecanumSpeedSet(CarInfo.errX * -0.03f, CarInfo.errY * 0.03f);
+                        CarInfo.PiReceiveFlag = 0;
+                    }
+                }
+                MecanumSpeedSet(0.0f, 0.0f);
+                if(loop_cnt == 1)
+                    MaterialPutFromOS(i,true);
+                else
+                    MaterialPutFromOS(i,false);
+
+                Command_Send(CMD_SWITCH);
+
+                CarPositionLoopSet(1);
+            }
+
+            Command_Send(CMD_CAPTURE_FINISH);
+
+            MoveTo(10,180,BLOCK);
+            TurnTo(-1.57f,BLOCK);
+            MoveTo(0,20,BLOCK);
+            TurnTo(0.0f,BLOCK);
+
+            if(loop_cnt == 1)
+                CarInfo.mainState = mEnd;
+            else{
+                loop_cnt ++;
+                CarInfo.mainState = mStorage;
+            }
+
             break;
         case mEnd:
-            MoveTo(0,180,BLOCK);
-            TurnTo(-1.57f,BLOCK);
             MoveTo(0,0,BLOCK);
-            TurnTo(0.0f,BLOCK);
             CarInfo.mainState = mStart;
             break;
     }
@@ -215,7 +256,7 @@ void MoveTo(float X, float Y,uint8_t block) {
     CarInfo.cpPidX.ctr.aim = -Y ;
 
     if(block)
-        while (!Data_RoughlyEqual(CarInfo.curY, CarInfo.curX, CarInfo.cpPidY.ctr.aim, CarInfo.cpPidX.ctr.aim, 2));
+        while (!Data_RoughlyEqual(CarInfo.curY, CarInfo.curX, CarInfo.cpPidY.ctr.aim, CarInfo.cpPidX.ctr.aim, 2) || CarInfo.isCarMoving);
 }
 
 void ClipMoveTo(int height) {
@@ -226,7 +267,7 @@ void ClipMoveTo(int height) {
 void TurnTo(float rad,uint8_t block) {
     CarInfo.aPid.ctr.aim = rad;
     if(block)
-        while (1)if (IsCarStatic)return;
+        while (fabs(CarInfo.yaw - CarInfo.aPid.ctr.aim) > 0.05 || CarInfo.isCarMoving);
 }
 
 void MaterialGetFromHAL(int slot)
@@ -387,10 +428,18 @@ void MaterialPutFromOS(int slot,bool stack)
     osDelay(500);
 
     //放下物料
-    CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(CarInfo.psi[4] != Ground_Height);
-    ClipRotition(CLIP_OPEN, 700);
-    osDelay(700);
+    if(stack){
+        CarInfo.mpPid[4].ctr.aim = Stack_Height;
+        while(CarInfo.psi[4] != Stack_Height);
+        ClipRotition(CLIP_OPEN, 700);
+        osDelay(700);
+    }
+    else{
+        CarInfo.mpPid[4].ctr.aim = Ground_Height;
+        while(CarInfo.psi[4] != Ground_Height);
+        ClipRotition(CLIP_OPEN, 700);
+        osDelay(700);
+    }
 
     //复位
     CarInfo.mpPid[4].ctr.aim = TopHeight;
@@ -459,6 +508,11 @@ uint8_t Data_RoughlyEqual(double curY, double curX, double aimY, double aimX, do
     if ((aimY - curY) * (aimY - curY) + (aimX - curX) * (aimX - curX) < thre * thre)
         return 1;
     return 0;
+}
+
+void Command_Send(uint8_t cmd)
+{
+    HAL_UART_Transmit(&huart4,&cmd,1,0xFF);
 }
 
 bool ProcessData(uint8_t c)
@@ -533,8 +587,8 @@ bool ProcessData(uint8_t c)
                         }
                         break;
                     case STATE_HEADER_IMAGE:
-                        CarInfo.errX = UARTRxBuffer.i16[0] + 15;
-                        CarInfo.errY = UARTRxBuffer.i16[1] - 15;
+                        CarInfo.errX = UARTRxBuffer.i16[0] + 12;
+                        CarInfo.errY = UARTRxBuffer.i16[1] - 12;
                         CarInfo.PiReceiveFlag = 1;
                         break;
                     default:
