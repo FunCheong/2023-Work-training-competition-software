@@ -74,11 +74,23 @@ static void __RunMainState(void) {
             break;
         case mScan:
             MoveTo(0,20,BLOCK);
-            MoveTo(60,20,BLOCK);//QRCode position
+            MoveTo(65,20,BLOCK);//QRCode position
+//            Command_Send(CMD_SCAN);
+//            osDelay(1000);//Wait for scan to finish
             CarInfo.mainState = mStorage;
             break;
         case mStorage:
-            MoveTo(140,20,BLOCK);//Storage position
+            MoveTo(142,15,BLOCK);//Storage position
+            CarInfo.StoreCaptureFlag = false;
+            Command_Send(CMD_CAPTURE_START);
+            for(i=1;i<=3;i++)
+            {
+                StoreMaterialGetPrepareFromOS();
+                while(!CarInfo.StoreCaptureFlag);
+                CarInfo.StoreCaptureFlag = false;
+                StoreMaterialGetFromOS(i);
+            }
+            Command_Send(CMD_CAPTURE_FINISH);
             CarInfo.mainState = mRaw;
             break;
         case mRaw:
@@ -88,7 +100,7 @@ static void __RunMainState(void) {
             Command_Send(CMD_CAPTURE_START);
 
             for(i=1;i<=3;i++) {
-                MoveTo(195,107,BLOCK);
+                MoveTo(195,115,BLOCK);
                 osDelay(500);//wait for camera to switch
                 CarInfo.PiReceiveFlag = 0;
                 CarPositionLoopSet(0);
@@ -126,7 +138,7 @@ static void __RunMainState(void) {
             Command_Send(CMD_CAPTURE_START);
 
             for(i=1;i<=3;i++) {
-                MoveTo(105,185,BLOCK);
+                MoveTo(100,185,BLOCK);
                 osDelay(500);//wait for camera to switch
                 CarInfo.PiReceiveFlag = 0;
                 CarPositionLoopSet(0);
@@ -447,6 +459,46 @@ void MaterialPutFromOS(int slot,bool stack)
     while(CarInfo.psi[4] > TopHeight);
 }
 
+void StoreMaterialGetPrepareFromOS()
+{
+    ClipRotition(CLIP_WIDEOPEN, 700);
+    CarInfo.mpPid[4].ctr.aim = Rotator_Height;
+    while(CarInfo.psi[4] != Rotator_Height);
+}
+
+void StoreMaterialGetFromOS(uint8_t slot)
+{
+    ClipRotition(CLIP_CLOSE,700);
+    osDelay(700);
+    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    switch(slot){
+        case 1:
+            StoreRotation(FirstDegree);
+            break;
+        case 2:
+            StoreRotation(SecondDegree);
+            break;
+        case 3:
+            StoreRotation(ThirdDegree);
+            break;
+    }
+    while(CarInfo.psi[4] != TopHeight);
+
+    SupportRotation(Store_Angle, 500);
+    osDelay(1000);
+
+    CarInfo.mpPid[4].ctr.aim = Store_Height;
+    while(CarInfo.psi[4] != Store_Height);
+
+    ClipRotition(CLIP_OPEN, 700);
+    osDelay(700);
+
+    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    while(CarInfo.psi[4] > TopHeight);
+    StoreRotation(SecondDegree);
+    SupportRotation(Ground_Angle, 500);
+}
+
 void Pi_SwitchFromOS(void) {
     __disable_irq();
     HAL_GPIO_WritePin(Pi_Switch_GPIO_Port, Pi_Switch_Pin, GPIO_PIN_SET);
@@ -530,10 +582,13 @@ bool ProcessData(uint8_t c)
                     commandState = STATE_HEADER_LIDAR;
                     data_cnt = 0;
                     break;
-                case 0X55:
+                case 0x55:
                     current_command = STATE_HEADER_IMAGE;
                     commandState = STATE_HEADER_IMAGE;
                     data_cnt = 0;
+                    break;
+                case 0xFC:
+                    CarInfo.StoreCaptureFlag = true;
                     break;
                 default:
                     current_command = STATE_IDLE;

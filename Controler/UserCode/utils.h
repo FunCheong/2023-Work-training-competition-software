@@ -39,6 +39,7 @@
 
 #define CLIP_CLOSE (1000)
 #define CLIP_OPEN  (830)
+#define CLIP_WIDEOPEN (650)
 
 #define IsCarStatic (!CarInfo.isCarMoving)
 
@@ -100,6 +101,7 @@ typedef struct CarControlBlock {
     bool Pi_Reset: 1;
     bool Start_State: 1;
     volatile bool PiReceiveFlag: 1;
+    volatile bool StoreCaptureFlag: 1;
 
     // 整车姿态相关数据
     hmcData_t hmc;
@@ -176,6 +178,10 @@ void MaterialPutFromHAL(int slot,bool stack);
 void MaterialGetFromOS(int slot);
 
 void MaterialPutFromOS(int slot,bool stack);
+
+void StoreMaterialGetPrepareFromOS();
+
+void StoreMaterialGetFromOS(uint8_t slot);
 
 void Command_Send(uint8_t cmd);
 
