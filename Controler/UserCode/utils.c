@@ -5,19 +5,14 @@
  * @date 2022/11/8
   */
 #include "tim.h"
-#include "key.h"
-#include "spi.h"
 #include "move.h"
 #include "usart.h"
 #include "utils.h"
 #include "printf.h"
 #include <stddef.h>
-#include <string.h>
 #include <stdlib.h>
 #include "cmsis_os2.h"
-#include "CommonKey/comKey.h"
 #include "LetterShell/shell.h"
-#include "./Compass/QMC5883L.h"
 #include "./ST7735-HAL/st7735.h"
 #include "SerialParaChanger/SPChanger.h"
 #include "LobotSerialServo/LobotSerialServo.h"
@@ -32,14 +27,7 @@ union UARTRxBuffer {
 command_state_t commandState = STATE_IDLE;//串口接收状态机
 uint8_t data_recv = 0;
 
-//TODO:原树莓派报文解包，需要修改
-#define PI_uX (UARTRxBuffer.u16[1])
-#define PI_uY (UARTRxBuffer.u16[2])
-
-#define PI_X (UARTRxBuffer.i16[1])
-#define PI_Y (UARTRxBuffer.i16[2])
-
-//TODO:测试用变量
+//TODO:发车测试用变量
 uint8_t go_flag = 0;
 
 int PIMaxError = 3;
@@ -53,12 +41,11 @@ do{PID_Init(&CarInfo.cpPidX, 0.8f, 0, 0);\
 PID_Init(&CarInfo.cpPidY, 0.8f, 0, 0);}while(0)
 
 static void __RunMainState(void) {
-    int i;
+    int i,target_cnt;
     float x_record[3],y_record[3];
     static uint8_t loop_cnt = 0;
 
     switch (CarInfo.mainState) {
-        osStatus_t status;
         case mStart:
             // TODO:升降电机初始化
 
@@ -73,29 +60,32 @@ static void __RunMainState(void) {
             }
             break;
         case mScan:
-            MoveTo(0,20,BLOCK);
+            SupportRotation(Ground_Angle, 500);
+            ClipRotition(CLIP_OPEN, 700);
             MoveTo(65,20,BLOCK);//QRCode position
 //            Command_Send(CMD_SCAN);
-//            osDelay(1000);//Wait for scan to finish
+            osDelay(1000);//Wait for scan to finish
             CarInfo.mainState = mStorage;
             break;
         case mStorage:
             MoveTo(142,15,BLOCK);//Storage position
             CarInfo.StoreCaptureFlag = false;
             Command_Send(CMD_CAPTURE_START);
-            for(i=1;i<=3;i++)
-            {
-                StoreMaterialGetPrepareFromOS();
-                while(!CarInfo.StoreCaptureFlag);
-                CarInfo.StoreCaptureFlag = false;
-                StoreMaterialGetFromOS(i);
-            }
+//            for(i=1;i<=3;i++)
+//            {
+//                StoreMaterialGetPrepareFromOS();
+//                while(!CarInfo.StoreCaptureFlag);
+//                CarInfo.StoreCaptureFlag = false;
+//                StoreMaterialGetFromOS(i);
+//            }
+            osDelay(12000);
             Command_Send(CMD_CAPTURE_FINISH);
             CarInfo.mainState = mRaw;
             break;
         case mRaw:
-            MoveTo(180,20,BLOCK);
-            TurnTo(1.57f,BLOCK);
+            MoveTo(180,20,NONBLOCK);
+            while(-CarInfo.curY < 160);
+            TurnTo(1.57f,NONBLOCK);
 
             Command_Send(CMD_CAPTURE_START);
 
@@ -105,9 +95,14 @@ static void __RunMainState(void) {
                 CarInfo.PiReceiveFlag = 0;
                 CarPositionLoopSet(0);
                 CarInfo.errX = 2;
-                while (abs(CarInfo.errX >= 2) || abs(CarInfo.errY >= 2)) {
+                target_cnt = 0;
+                while (target_cnt<=5) {
                     if (CarInfo.PiReceiveFlag) {
                         MecanumSpeedSet(CarInfo.errX * -0.03f, CarInfo.errY * 0.03f);
+                        if(abs(CarInfo.errX >= 2) || abs(CarInfo.errY >= 2))
+                            target_cnt = 0;
+                        else
+                            target_cnt++;
                         CarInfo.PiReceiveFlag = 0;
                     }
                 }
@@ -119,6 +114,10 @@ static void __RunMainState(void) {
                 MaterialPutFromOS(i,false);
 
                 Command_Send(CMD_SWITCH);
+
+                CarInfo.cpPidY.ctr.aim = CarInfo.curY;
+                CarInfo.cpPidX.ctr.aim = CarInfo.curX;
+                MoveTo(-CarInfo.curY,-CarInfo.curX,NONBLOCK);//Ensure the slew function to work properly
 
                 CarPositionLoopSet(1);
             }
@@ -132,8 +131,9 @@ static void __RunMainState(void) {
             CarInfo.mainState = mRough;
             break;
         case mRough:
-            MoveTo(180,180,BLOCK);
-            TurnTo(3.14f,BLOCK);
+            MoveTo(180,180,NONBLOCK);
+            while(-CarInfo.curX < 160);
+            TurnTo(3.14f,NONBLOCK);
 
             Command_Send(CMD_CAPTURE_START);
 
@@ -143,9 +143,14 @@ static void __RunMainState(void) {
                 CarInfo.PiReceiveFlag = 0;
                 CarPositionLoopSet(0);
                 CarInfo.errX = 2;
-                while (abs(CarInfo.errX >= 2) || abs(CarInfo.errY >= 2)) {
+                target_cnt = 0;
+                while (target_cnt<=5) {
                     if (CarInfo.PiReceiveFlag) {
                         MecanumSpeedSet(CarInfo.errX * -0.03f, CarInfo.errY * 0.03f);
+                        if(abs(CarInfo.errX >= 2) || abs(CarInfo.errY >= 2))
+                            target_cnt = 0;
+                        else
+                            target_cnt++;
                         CarInfo.PiReceiveFlag = 0;
                     }
                 }
@@ -157,26 +162,39 @@ static void __RunMainState(void) {
 
                 Command_Send(CMD_SWITCH);
 
+                CarInfo.cpPidY.ctr.aim = CarInfo.curY;
+                CarInfo.cpPidX.ctr.aim = CarInfo.curX;
+                MoveTo(-CarInfo.curY,-CarInfo.curX,NONBLOCK);//Ensure the slew function to work properly
+
                 CarPositionLoopSet(1);
             }
 
             Command_Send(CMD_CAPTURE_FINISH);
 
-            MoveTo(10,180,BLOCK);
-            TurnTo(-1.57f,BLOCK);
-            MoveTo(0,20,BLOCK);
-            TurnTo(0.0f,BLOCK);
-
-            if(loop_cnt == 1)
+            if(loop_cnt == 1) {
+                MoveTo(10, 180, NONBLOCK);
+                while (-CarInfo.curY > 30);
+                TurnTo(-1.57f, NONBLOCK);
+                MoveTo(0, 20, NONBLOCK);
+                while (-CarInfo.curX > 90);
+                TurnTo(0.0f, BLOCK);
                 CarInfo.mainState = mEnd;
+            }
             else{
                 loop_cnt ++;
+                MoveTo(190,180,NONBLOCK);
+                while(-CarInfo.curY < 160);
+                TurnTo(1.57f, NONBLOCK);
+                MoveTo(190,20,NONBLOCK);
+                while(-CarInfo.curX > 40);
+                TurnTo(0.0f, NONBLOCK);
                 CarInfo.mainState = mStorage;
             }
 
             break;
         case mEnd:
             MoveTo(0,0,BLOCK);
+            loop_cnt = 0;
             CarInfo.mainState = mStart;
             break;
     }
@@ -189,7 +207,7 @@ CCB_Typedef CarInfo = {
         .opticalConfigX = 1.0f,
         .mPsiCtr = 0,
         .cPsiCtr = 1,
-        .spdLimit = {20, 20, 20, 20, 10},
+        .spdLimit = {50, 50, 50, 50,35},
         .mainState = mStart,
         .SerialOutputEnable = 0,
         .RunMainState = __RunMainState,
@@ -264,11 +282,13 @@ void ClipOpenForOS(void) {
 extern char chBuff;
 
 void MoveTo(float X, float Y,uint8_t block) {
-    CarInfo.cpPidY.ctr.aim = -X ;
-    CarInfo.cpPidX.ctr.aim = -Y ;
+    CarInfo.tarY = -X ;
+    CarInfo.tarX = -Y ;
+//    CarInfo.cpPidY.ctr.aim = -X ;
+//    CarInfo.cpPidX.ctr.aim = -Y ;
 
     if(block)
-        while (!Data_RoughlyEqual(CarInfo.curY, CarInfo.curX, CarInfo.cpPidY.ctr.aim, CarInfo.cpPidX.ctr.aim, 2) || CarInfo.isCarMoving);
+        while (!Data_RoughlyEqual(CarInfo.curY, CarInfo.curX, CarInfo.tarY, CarInfo.tarX, 2) || CarInfo.isCarMoving);
 }
 
 void ClipMoveTo(int height) {
@@ -285,7 +305,7 @@ void TurnTo(float rad,uint8_t block) {
 void MaterialGetFromHAL(int slot)
 {
     SupportRotation(Ground_Angle, 500);
-    ClipRotition(CLIP_OPEN,500);
+    ClipRotition(CLIP_OPEN,200);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -300,26 +320,26 @@ void MaterialGetFromHAL(int slot)
     HAL_Delay(500);
 
     CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(CarInfo.psi[4] < Ground_Height);
+    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
 
-    ClipRotition(CLIP_CLOSE, 700);
-    HAL_Delay(700);
+    ClipRotition(CLIP_CLOSE, 200);
+    HAL_Delay(200);
 
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
-    SupportRotation(Store_Angle, 500);
-    HAL_Delay(700);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    SupportRotation(Store_Angle, 200);
+    HAL_Delay(1200);
 
     CarInfo.mpPid[4].ctr.aim = Store_Height;
-    while(CarInfo.psi[4] != Store_Height);
+    while(fabs(CarInfo.psi[4] - Store_Height) > 5);
 
-    ClipRotition(CLIP_OPEN, 700);
-    HAL_Delay(700);
+    ClipRotition(CLIP_OPEN, 200);
+    HAL_Delay(200);
 
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
     StoreRotation(SecondDegree);
-    SupportRotation(Ground_Angle, 500);
+    SupportRotation(Ground_Angle, 200);
 }
 
 void MaterialPutFromHAL(int slot,bool stack)
@@ -327,7 +347,7 @@ void MaterialPutFromHAL(int slot,bool stack)
     //旋转到对应存储槽位
     CarInfo.mpPid[4].ctr.aim = TopHeight;
 
-    ClipRotition(CLIP_OPEN,500);
+    ClipRotition(CLIP_OPEN,200);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -339,38 +359,38 @@ void MaterialPutFromHAL(int slot,bool stack)
             StoreRotation(ThirdDegree);
             break;
     }
-    HAL_Delay(500);
-    while(CarInfo.psi[4] > TopHeight);
+    HAL_Delay(200);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
 
-    SupportRotation(Store_Angle, 500);
+    SupportRotation(Store_Angle, 300);
     HAL_Delay(1000);
     //夹子移动到存储高度
     CarInfo.mpPid[4].ctr.aim = Store_Height;
-    while(CarInfo.psi[4] != Store_Height);
+    while(fabs(CarInfo.psi[4] - Store_Height) > 5);
     //夹起物料
-    ClipRotition(CLIP_CLOSE, 700);
-    HAL_Delay(700);
+    ClipRotition(CLIP_CLOSE, 200);
+    HAL_Delay(200);
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
     SupportRotation(Ground_Angle, 500);
     HAL_Delay(500);
 
     //放下物料
     CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(CarInfo.psi[4] != Ground_Height);
-    ClipRotition(CLIP_OPEN, 700);
-    HAL_Delay(700);
+    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    ClipRotition(CLIP_OPEN, 200);
+    HAL_Delay(200);
 
     //复位
     CarInfo.mpPid[4].ctr.aim = TopHeight;
     StoreRotation(SecondDegree);
-    while(CarInfo.psi[4] > TopHeight);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
 }
 
 void MaterialGetFromOS(int slot)
 {
     SupportRotation(Ground_Angle, 500);
-    ClipRotition(CLIP_OPEN,500);
+    ClipRotition(CLIP_OPEN,200);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -385,26 +405,26 @@ void MaterialGetFromOS(int slot)
     osDelay(500);
 
     CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(CarInfo.psi[4] < Ground_Height);
+    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
 
-    ClipRotition(CLIP_CLOSE, 700);
-    osDelay(700);
+    ClipRotition(CLIP_CLOSE, 200);
+    osDelay(200);
 
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
-    SupportRotation(Store_Angle, 500);
-    osDelay(1000);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    SupportRotation(Store_Angle, 200);
+    osDelay(1200);
 
     CarInfo.mpPid[4].ctr.aim = Store_Height;
-    while(CarInfo.psi[4] != Store_Height);
+    while(fabs(CarInfo.psi[4] - Store_Height) > 5);
 
-    ClipRotition(CLIP_OPEN, 700);
-    osDelay(700);
+    ClipRotition(CLIP_OPEN, 200);
+    osDelay(200);
 
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
     StoreRotation(SecondDegree);
-    SupportRotation(Ground_Angle, 500);
+    SupportRotation(Ground_Angle, 200);
 }
 
 void MaterialPutFromOS(int slot,bool stack)
@@ -412,7 +432,7 @@ void MaterialPutFromOS(int slot,bool stack)
     //旋转到对应存储槽位
     CarInfo.mpPid[4].ctr.aim = TopHeight;
 
-    ClipRotition(CLIP_OPEN,500);
+    ClipRotition(CLIP_OPEN,200);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -424,39 +444,32 @@ void MaterialPutFromOS(int slot,bool stack)
             StoreRotation(ThirdDegree);
             break;
     }
-    osDelay(500);
-    while(CarInfo.psi[4] > TopHeight);
+    osDelay(200);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
 
-    SupportRotation(Store_Angle, 500);
+    SupportRotation(Store_Angle, 300);
     osDelay(1000);
     //夹子移动到存储高度
     CarInfo.mpPid[4].ctr.aim = Store_Height;
-    while(CarInfo.psi[4] != Store_Height);
+    while(fabs(CarInfo.psi[4] - Store_Height) > 5);
     //夹起物料
-    ClipRotition(CLIP_CLOSE, 700);
-    osDelay(700);
+    ClipRotition(CLIP_CLOSE, 200);
+    osDelay(200);
     CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);    SupportRotation(Ground_Angle, 500);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    SupportRotation(Ground_Angle, 500);
     osDelay(500);
 
     //放下物料
-    if(stack){
-        CarInfo.mpPid[4].ctr.aim = Stack_Height;
-        while(CarInfo.psi[4] != Stack_Height);
-        ClipRotition(CLIP_OPEN, 700);
-        osDelay(700);
-    }
-    else{
-        CarInfo.mpPid[4].ctr.aim = Ground_Height;
-        while(CarInfo.psi[4] != Ground_Height);
-        ClipRotition(CLIP_OPEN, 700);
-        osDelay(700);
-    }
+    CarInfo.mpPid[4].ctr.aim = Ground_Height;
+    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    ClipRotition(CLIP_OPEN, 200);
+    osDelay(200);
 
     //复位
     CarInfo.mpPid[4].ctr.aim = TopHeight;
     StoreRotation(SecondDegree);
-    while(CarInfo.psi[4] > TopHeight);
+    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
 }
 
 void StoreMaterialGetPrepareFromOS()
@@ -481,6 +494,8 @@ void StoreMaterialGetFromOS(uint8_t slot)
         case 3:
             StoreRotation(ThirdDegree);
             break;
+        default:
+            return;
     }
     while(CarInfo.psi[4] != TopHeight);
 
@@ -527,33 +542,6 @@ void Pi_ResetFromHAL(void) {
     HAL_GPIO_WritePin(Pi_Reset_GPIO_Port, Pi_Reset_Pin, GPIO_PIN_SET);
     HAL_Delay(5);
     HAL_GPIO_WritePin(Pi_Reset_GPIO_Port, Pi_Reset_Pin, GPIO_PIN_RESET);
-}
-
-
-void Data_ReFormatData(uint16_t *array, int len) {
-    char record;
-    uint16_t temp[len];
-    int j = 0;
-
-    if (array[0] == 0x5555) {
-        return;
-    } else {
-        for (int i = 0;; i++) {
-            if (array[i] == 0x5555) {
-                record = i;
-                break;
-            }
-        }
-        for (int i = record; i < len; i++) {
-            temp[j++] = array[i];
-        }
-        for (int i = 0; i < record; i++) {
-            temp[j++] = array[i];
-        }
-        for (int i = 0; i < len; i++) {
-            array[i] = temp[i];
-        }
-    }
 }
 
 uint8_t Data_RoughlyEqual(double curY, double curX, double aimY, double aimX, double thre) {
@@ -623,7 +611,7 @@ bool ProcessData(uint8_t c)
                         y = (float)UARTRxBuffer.i16[1];
                         yaw = ((float)UARTRxBuffer.i16[2])/100;
 
-                        //TODO:做零点初始化
+                        //use first 100 data for calibration
                         if(position_cnt <= 100){
                             x_offset += x;
                             y_offset += y;

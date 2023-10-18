@@ -28,23 +28,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "key.h"
 #include "move.h"
 #include "motor.h"
 #include "utils.h"
 #include "printf.h"
-#include "stdlib.h"
 #include "PID/pid.h"
-#include "Filter/filter.h"
-#include "Compass/QMC5883L.h"
-#include "ST7735-HAL/st7735.h"
-#include "ICM42605/ICM42605.h"
 #include "imuFusion/imuFusion.h"
-#include "StepHelper/stepHelper.h"
-#include "SerialParaChanger/SPChanger.h"
-#include "CommonKey/comKey.h"
 #include "LobotSerialServo/LobotSerialServo.h"
-
 #include "utils.h"
 /* USER CODE END Includes */
 
@@ -69,10 +59,9 @@
 //Shell variables
 char shBuff[256];
 char chBuff;
-
-//TODO:测试用变量
-extern uint8_t data_recv;
 int slot = 0;
+
+extern uint8_t data_recv;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -182,12 +171,9 @@ int main(void)
     while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     HAL_Delay(300);
 
-//    SupportRotation(Store_Angle, 500);
-//    ClipRotition(CLIP_CLOSE, 700);
-    SupportRotation(Ground_Angle, 500);
-    ClipRotition(CLIP_OPEN, 700);
+    SupportRotation(Store_Angle, 500);
+    ClipRotition(CLIP_CLOSE, 700);
     StoreRotation(SecondDegree);
-
 
     //TODO:位置环测试用PID
     for (int i = 0; i < 4; i++) {
@@ -204,6 +190,7 @@ int main(void)
     CarInfo.spdY = 0;
 
     CarInfo.Start_State = true;
+
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -216,9 +203,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
     while (1) {
-        //TODO:抓取动作测试
-        if(slot) {
-            MaterialPutFromHAL(slot, 0);
+        if(slot != 0){
+            MaterialPutFromHAL(slot,false);
+            MaterialGetFromHAL(slot);
             slot = 0;
         }
     /* USER CODE END WHILE */
@@ -364,25 +351,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             for (int i = 0; i < 5; i++)
                 CarInfo.psi[i] += (float)CarInfo.spd[i];
 
-            //TODO:加位置环死区
-
             // Map PID
             if (CarInfo.cPsiCtr && !CarInfo.mPsiCtr) {
+                Slew_Func(&CarInfo.cpPidY.ctr.aim,CarInfo.tarY,0.6f);
+                Slew_Func(&CarInfo.cpPidX.ctr.aim,CarInfo.tarX,0.6f);
 
-                float spd_tmp_x,spd_tmp_y;
-
-                spd_tmp_x = PID_Realize(&CarInfo.cpPidX, CarInfo.curX);
-                spd_tmp_y = PID_Realize(&CarInfo.cpPidY, CarInfo.curY);
+                CarInfo.spdX = PID_Realize(&CarInfo.cpPidX, CarInfo.curX);
+                CarInfo.spdY = PID_Realize(&CarInfo.cpPidY, CarInfo.curY);
 
                 //Output dead band
-                spd_tmp_x = (fabs(spd_tmp_x) < 1.6) ? 0 : spd_tmp_x;
-                spd_tmp_y = (fabs(spd_tmp_y) < 1.6) ? 0 : spd_tmp_y;
+                CarInfo.spdX = (fabs(CarInfo.spdX) < 1.6) ? 0 : CarInfo.spdX;
+                CarInfo.spdY = (fabs(CarInfo.spdY) < 1.6) ? 0 : CarInfo.spdY;
 
-                Slew_Func(&CarInfo.spdX,spd_tmp_x,0.2f);
-                Slew_Func(&CarInfo.spdY,spd_tmp_y,0.2f);
+//                Slew_Func(&CarInfo.spdX,CarInfo.spdX,0.2f);
+//                Slew_Func(&CarInfo.spdY,CarInfo.spdY,0.2f);
 
                 //Speed output limit
-                int temp = 15;
+                int temp = 40;
                 CarInfo.spdX = CarInfo.spdX > temp ? temp : CarInfo.spdX < -temp ? -temp : CarInfo.spdX;
                 CarInfo.spdY = CarInfo.spdY > temp ? temp : CarInfo.spdY < -temp ? -temp : CarInfo.spdY;
 
@@ -396,7 +381,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
             Slew_Func(&CarInfo.avPidOut,PID_RealizeForAngle(&CarInfo.aPid, CarInfo.yaw),0.2f);
 
             //Speed limit
-            int temp = 20;
+            float temp = 20;
             CarInfo.avPidOut = CarInfo.avPidOut > temp ? temp : CarInfo.avPidOut < -temp ? -temp : CarInfo.avPidOut;
 
             // Motor PID

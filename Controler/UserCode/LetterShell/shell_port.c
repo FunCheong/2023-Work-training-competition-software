@@ -141,6 +141,7 @@ uint8_t mapmove(int argc, char *argv[]) {
 
 uint8_t materialput(int argc, char *argv[]){
         slot = atoi(argv[1]);
+        return 0;
 }
 
 uint8_t rota(int argc, char *argv[]) {

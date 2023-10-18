@@ -13,9 +13,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="90a625bc-e67f-426c-93e9-07a5d71bd602" name="变更" comment="完成姿态闭环调节">
-      <change afterPath="$PROJECT_DIR$/stlink.cfg" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Controler/Core/Src/main.c" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/Core/Src/main.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controler/MDK-ARM/Controler.uvoptx" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/MDK-ARM/Controler.uvoptx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controler/MDK-ARM/xxxx.txt" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/MDK-ARM/xxxx.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controler/UserCode/LetterShell/shell_port.c" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/UserCode/LetterShell/shell_port.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controler/UserCode/utils.c" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/UserCode/utils.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Controler/UserCode/utils.h" beforeDir="false" afterPath="$PROJECT_DIR$/Controler/UserCode/utils.h" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

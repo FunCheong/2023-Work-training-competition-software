@@ -17,7 +17,7 @@
 #include "ST7735-HAL/fonts.h"
 
 //TODO:调整车体中心，目前还是有点歪
-//Liddar offset
+//lidar's offset from middle of car
 #define XBIAS (10.5f)
 #define YBIAS (-1.5f)
 
@@ -25,7 +25,7 @@
 #define ToRad(dig) (dig * 0.01745329251994329576923690768489f)
 
 #define TopHeight       (50)
-#define Ground_Height   (2150)
+#define Ground_Height   (1950)
 #define Store_Height    (350)
 #define Rotator_Height (950)
 #define Stack_Height (1050)
@@ -92,6 +92,7 @@ typedef struct CarControlBlock {
     PMW3901 pmw;
     float dx, dy;
     volatile float curX, curY;
+    volatile float tarX, tarY;
     Pid_t cpPidX, cpPidY;// Car position pid
     int16_t errX,errY;
     float spdX, spdY;
@@ -157,15 +158,7 @@ void ClipMoveTo(int height);
 
 void TurnTo(float rad,uint8_t block);
 
-void Pi_SwitchFromOS(void);
-
-void Pi_SwitchFromHAL(void);
-
 void Pi_ResetFromOS(void);
-
-void Pi_ResetFromHAL(void);
-
-void Data_ReFormatData(uint16_t *array, int len);
 
 bool ProcessData(uint8_t c);
 
