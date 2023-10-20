@@ -390,7 +390,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
                 // Optional position loop for guide motor
                 if (i == 4 || CarInfo.mPsiCtr) {
-                    CarInfo.spdStep = 0.5f;
+                    CarInfo.spdStep = 0.6f;
                     float *outPtr = &CarInfo.mpPIDout[i];
                     float res = PID_Realize(&CarInfo.mpPid[i], CarInfo.psi[i]);
 

@@ -71,15 +71,19 @@ static void __RunMainState(void) {
             MoveTo(142,15,BLOCK);//Storage position
             CarInfo.StoreCaptureFlag = false;
             Command_Send(CMD_CAPTURE_START);
-//            for(i=1;i<=3;i++)
-//            {
-//                StoreMaterialGetPrepareFromOS();
-//                while(!CarInfo.StoreCaptureFlag);
-//                CarInfo.StoreCaptureFlag = false;
-//                StoreMaterialGetFromOS(i);
-//            }
+            for(i=1;i<=3;i++)
+            {
+                StoreMaterialGetPrepareFromOS();
+                while(!CarInfo.StoreCaptureFlag);
+                CarInfo.StoreCaptureFlag = false;
+                StoreMaterialGetFromOS(i);
+            }
             osDelay(12000);
             Command_Send(CMD_CAPTURE_FINISH);
+
+            CarInfo.mpPid[4].ctr.aim = -10000;
+            while (CarInfo.mpPid[4].ctr.aim != TopHeight);
+
             CarInfo.mainState = mRaw;
             break;
         case mRaw:
@@ -128,6 +132,9 @@ static void __RunMainState(void) {
                 MoveTo(-y_record[i-1],-x_record[i-1],BLOCK);
                 MaterialGetFromOS(i);
             }
+
+            CarInfo.mpPid[4].ctr.aim = -10000;
+            while (CarInfo.mpPid[4].ctr.aim != TopHeight);
             CarInfo.mainState = mRough;
             break;
         case mRough:
@@ -171,12 +178,15 @@ static void __RunMainState(void) {
 
             Command_Send(CMD_CAPTURE_FINISH);
 
+            CarInfo.mpPid[4].ctr.aim = -10000;
+            while (CarInfo.mpPid[4].ctr.aim != TopHeight);
+
             if(loop_cnt == 1) {
                 MoveTo(10, 180, NONBLOCK);
                 while (-CarInfo.curY > 30);
                 TurnTo(-1.57f, NONBLOCK);
                 MoveTo(0, 20, NONBLOCK);
-                while (-CarInfo.curX > 90);
+                while (-CarInfo.curX > 100);
                 TurnTo(0.0f, BLOCK);
                 CarInfo.mainState = mEnd;
             }
@@ -457,12 +467,20 @@ void MaterialPutFromOS(int slot,bool stack)
     osDelay(200);
     CarInfo.mpPid[4].ctr.aim = TopHeight;
     while(fabs(CarInfo.psi[4] - TopHeight) > 5);
-    SupportRotation(Ground_Angle, 500);
-    osDelay(500);
+    SupportRotation(Ground_Angle, 200);
 
     //放下物料
-    CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    if(stack){
+        osDelay(700);
+        CarInfo.mpPid[4].ctr.aim = Stack_Height;
+        while(fabs(CarInfo.psi[4] - Stack_Height) > 5);
+    }
+    else{
+        osDelay(500);
+        CarInfo.mpPid[4].ctr.aim = Ground_Height;
+        while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    }
+
     ClipRotition(CLIP_OPEN, 200);
     osDelay(200);
 
