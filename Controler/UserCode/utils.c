@@ -63,22 +63,22 @@ static void __RunMainState(void) {
             SupportRotation(Ground_Angle, 500);
             ClipRotition(CLIP_OPEN, 700);
             MoveTo(65,20,BLOCK);//QRCode position
-//            Command_Send(CMD_SCAN);
-            osDelay(1000);//Wait for scan to finish
+            Command_Send(CMD_SCAN);
+            osDelay(2000);//Wait for scan to finish
             CarInfo.mainState = mStorage;
             break;
         case mStorage:
-            MoveTo(142,15,BLOCK);//Storage position
+            MoveTo(142,14,BLOCK);//Storage position
             CarInfo.StoreCaptureFlag = false;
-            Command_Send(CMD_CAPTURE_START);
             for(i=1;i<=3;i++)
             {
                 StoreMaterialGetPrepareFromOS();
+                if(i == 1)
+                    Command_Send(CMD_CAPTURE_START);
                 while(!CarInfo.StoreCaptureFlag);
                 CarInfo.StoreCaptureFlag = false;
                 StoreMaterialGetFromOS(i);
             }
-            osDelay(12000);
             Command_Send(CMD_CAPTURE_FINISH);
 
             CarInfo.mpPid[4].ctr.aim = -10000;
@@ -217,7 +217,7 @@ CCB_Typedef CarInfo = {
         .opticalConfigX = 1.0f,
         .mPsiCtr = 0,
         .cPsiCtr = 1,
-        .spdLimit = {50, 50, 50, 50,35},
+        .spdLimit = {50, 50, 50, 50,30},
         .mainState = mStart,
         .SerialOutputEnable = 0,
         .RunMainState = __RunMainState,
@@ -335,8 +335,8 @@ void MaterialGetFromHAL(int slot)
     ClipRotition(CLIP_CLOSE, 200);
     HAL_Delay(200);
 
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     SupportRotation(Store_Angle, 200);
     HAL_Delay(1200);
 
@@ -346,8 +346,8 @@ void MaterialGetFromHAL(int slot)
     ClipRotition(CLIP_OPEN, 200);
     HAL_Delay(200);
 
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     StoreRotation(SecondDegree);
     SupportRotation(Ground_Angle, 200);
 }
@@ -355,7 +355,7 @@ void MaterialGetFromHAL(int slot)
 void MaterialPutFromHAL(int slot,bool stack)
 {
     //旋转到对应存储槽位
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    CarInfo.mpPid[4].ctr.aim = -10000;
 
     ClipRotition(CLIP_OPEN,200);
     switch(slot){
@@ -370,7 +370,7 @@ void MaterialPutFromHAL(int slot,bool stack)
             break;
     }
     HAL_Delay(200);
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
 
     SupportRotation(Store_Angle, 300);
     HAL_Delay(1000);
@@ -380,27 +380,35 @@ void MaterialPutFromHAL(int slot,bool stack)
     //夹起物料
     ClipRotition(CLIP_CLOSE, 200);
     HAL_Delay(200);
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
-    SupportRotation(Ground_Angle, 500);
-    HAL_Delay(500);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
+    SupportRotation(Ground_Angle, 200);
 
     //放下物料
-    CarInfo.mpPid[4].ctr.aim = Ground_Height;
-    while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    if(stack){
+        HAL_Delay(700);
+        CarInfo.mpPid[4].ctr.aim = Stack_Height;
+        while(fabs(CarInfo.psi[4] - Stack_Height) > 5);
+    }
+    else{
+        HAL_Delay(700);
+        CarInfo.mpPid[4].ctr.aim = Ground_Height;
+        while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
+    }
+
     ClipRotition(CLIP_OPEN, 200);
     HAL_Delay(200);
 
     //复位
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    CarInfo.mpPid[4].ctr.aim = -10000;
     StoreRotation(SecondDegree);
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
 }
 
 void MaterialGetFromOS(int slot)
 {
     SupportRotation(Ground_Angle, 500);
-    ClipRotition(CLIP_OPEN,200);
+    ClipRotition(CLIP_WIDEOPEN,200);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -418,10 +426,10 @@ void MaterialGetFromOS(int slot)
     while(fabs(CarInfo.psi[4] - Ground_Height) > 5);
 
     ClipRotition(CLIP_CLOSE, 200);
-    osDelay(200);
+    osDelay(500);
 
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     SupportRotation(Store_Angle, 200);
     osDelay(1200);
 
@@ -431,8 +439,8 @@ void MaterialGetFromOS(int slot)
     ClipRotition(CLIP_OPEN, 200);
     osDelay(200);
 
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     StoreRotation(SecondDegree);
     SupportRotation(Ground_Angle, 200);
 }
@@ -440,7 +448,7 @@ void MaterialGetFromOS(int slot)
 void MaterialPutFromOS(int slot,bool stack)
 {
     //旋转到对应存储槽位
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    CarInfo.mpPid[4].ctr.aim = -10000;
 
     ClipRotition(CLIP_OPEN,200);
     switch(slot){
@@ -455,7 +463,7 @@ void MaterialPutFromOS(int slot,bool stack)
             break;
     }
     osDelay(200);
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
 
     SupportRotation(Store_Angle, 300);
     osDelay(1000);
@@ -465,8 +473,8 @@ void MaterialPutFromOS(int slot,bool stack)
     //夹起物料
     ClipRotition(CLIP_CLOSE, 200);
     osDelay(200);
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     SupportRotation(Ground_Angle, 200);
 
     //放下物料
@@ -485,23 +493,25 @@ void MaterialPutFromOS(int slot,bool stack)
     osDelay(200);
 
     //复位
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    CarInfo.mpPid[4].ctr.aim = -10000;
     StoreRotation(SecondDegree);
-    while(fabs(CarInfo.psi[4] - TopHeight) > 5);
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
 }
 
 void StoreMaterialGetPrepareFromOS()
 {
-    ClipRotition(CLIP_WIDEOPEN, 700);
+    ClipRotition(CLIP_WIDEOPEN, 200);
+    osDelay(500);
     CarInfo.mpPid[4].ctr.aim = Rotator_Height;
-    while(CarInfo.psi[4] != Rotator_Height);
+    while(fabs(CarInfo.psi[4] - Rotator_Height) > 5);
 }
 
 void StoreMaterialGetFromOS(uint8_t slot)
 {
-    ClipRotition(CLIP_CLOSE,700);
-    osDelay(700);
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
+    ClipRotition(CLIP_CLOSE,200);
+    osDelay(500);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     switch(slot){
         case 1:
             StoreRotation(FirstDegree);
@@ -515,21 +525,22 @@ void StoreMaterialGetFromOS(uint8_t slot)
         default:
             return;
     }
-    while(CarInfo.psi[4] != TopHeight);
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
+    //while(fabs(CarInfo.psi[4] - TopHeight) > 5);
 
-    SupportRotation(Store_Angle, 500);
+    SupportRotation(Store_Angle, 200);
     osDelay(1000);
 
     CarInfo.mpPid[4].ctr.aim = Store_Height;
-    while(CarInfo.psi[4] != Store_Height);
+    while(fabs(CarInfo.psi[4] - Store_Height) > 5);
 
-    ClipRotition(CLIP_OPEN, 700);
-    osDelay(700);
+    ClipRotition(CLIP_OPEN, 200);
+    osDelay(300);
 
-    CarInfo.mpPid[4].ctr.aim = TopHeight;
-    while(CarInfo.psi[4] > TopHeight);
+    CarInfo.mpPid[4].ctr.aim = -10000;
+    while (CarInfo.mpPid[4].ctr.aim != TopHeight);
     StoreRotation(SecondDegree);
-    SupportRotation(Ground_Angle, 500);
+    SupportRotation(Ground_Angle, 200);
 }
 
 void Pi_SwitchFromOS(void) {
@@ -596,6 +607,9 @@ bool ProcessData(uint8_t c)
                 case 0xFC:
                     CarInfo.StoreCaptureFlag = true;
                     break;
+                case 0xFE:
+                    go_flag = 1;
+                    break;
                 default:
                     current_command = STATE_IDLE;
                     return false;
@@ -648,7 +662,7 @@ bool ProcessData(uint8_t c)
                         }
                         break;
                     case STATE_HEADER_IMAGE:
-                        CarInfo.errX = UARTRxBuffer.i16[0] + 12;
+                        CarInfo.errX = UARTRxBuffer.i16[0];
                         CarInfo.errY = UARTRxBuffer.i16[1] - 12;
                         CarInfo.PiReceiveFlag = 1;
                         break;

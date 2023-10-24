@@ -172,6 +172,7 @@ int main(void)
     HAL_Delay(300);
 
     SupportRotation(Store_Angle, 500);
+//    SupportRotation(Ground_Angle, 500);
     ClipRotition(CLIP_CLOSE, 700);
     StoreRotation(SecondDegree);
 
@@ -390,15 +391,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
                 // Optional position loop for guide motor
                 if (i == 4 || CarInfo.mPsiCtr) {
-                    CarInfo.spdStep = 0.6f;
+                    CarInfo.spdStep = 0.5f;
                     float *outPtr = &CarInfo.mpPIDout[i];
                     float res = PID_Realize(&CarInfo.mpPid[i], CarInfo.psi[i]);
 
                     // Limit acceleration
-                    if (res > *outPtr && res > 0 && *outPtr >= 0)
-                        *outPtr = *outPtr < res ? *outPtr + CarInfo.spdStep : *outPtr;
-                    else if (res < *outPtr && res < 0 && *outPtr <= 0)
-                        *outPtr = *outPtr > res ? *outPtr - CarInfo.spdStep : *outPtr;
+                    if (res > *outPtr && res > 0 && HAL_GPIO_ReadPin(ClipLimit_GPIO_Port, ClipLimit_Pin) == GPIO_PIN_RESET)
+                        *outPtr = res - *outPtr > CarInfo.spdStep ? *outPtr + CarInfo.spdStep : *outPtr;
+                    else if (res < *outPtr && res < 0 && HAL_GPIO_ReadPin(ClipLimit_GPIO_Port, ClipLimit_Pin) == GPIO_PIN_RESET)
+                        *outPtr = *outPtr - res > CarInfo.spdStep ? *outPtr - CarInfo.spdStep : *outPtr;
                     else *outPtr = res;
 
                     // Limit speed max

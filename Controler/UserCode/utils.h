@@ -25,10 +25,10 @@
 #define ToRad(dig) (dig * 0.01745329251994329576923690768489f)
 
 #define TopHeight       (50)
-#define Ground_Height   (1950)
-#define Store_Height    (350)
-#define Rotator_Height (950)
-#define Stack_Height (1050)
+#define Ground_Height   (1350)
+#define Store_Height    (300)
+#define Rotator_Height (660)
+#define Stack_Height (750)
 
 #define Ground_Angle (232)
 #define Store_Angle (52)
